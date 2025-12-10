@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# Brug: sudo ./create_students.sh students.txt
+
+if [ "$EUID" -ne 0 ]; then
+  echo "Kør dette script som root (brug sudo)."
+  exit 1
+fi
+
+if [ -z "$1" ]; then
+  echo "Brug: $0 students.txt"
+  exit 1
+fi
+
+INPUT_FILE="$1"
+
+if [ ! -f "$INPUT_FILE" ]; then
+  echo "Filen '$INPUT_FILE' findes ikke."
+  exit 1
+fi
+
+GROUP_NAME="students"
+
+# Opret evt. en fælles gruppe til eleverne
+if ! getent group "$GROUP_NAME" >/dev/null; then
+  echo "Opretter gruppe: $GROUP_NAME"
+  groupadd "$GROUP_NAME"
+fi
+
+echo "Opretter brugere ud fra: $INPUT_FILE"
+echo
+
+while IFS= read -r line; do
+  # spring tomme linjer og kommentarer over
+  if [ -z "$line" ] || [[ "$line" =~ ^# ]]; then
+    continue
+  fi
+
+  full_name="$line"
+
+  # lav til lowercase
+  lower_name=$(echo "$full_name" | tr '[:upper:]' '[:lower:]')
+
+  # tag første og sidste “ord” som for- og efternavn
+  first=$(echo "$lower_name" | awk '{print $1}')
+  last=$(echo "$lower_name" | awk '{print $NF}')
+
+  # lav brugernavn: fornavn.efternavn
+  base_username="${first}.${last}"
+
+  # fjern alle tegn der ikke er bogstaver, tal, punktum, underscore eller bindestreg
+  username=$(echo "$base_username" | tr -cd '[:alnum:]._-')
+
+  # klip til max 16 tegn (klassisk unix-begrænsning, mange systemer holder sig deromkring)
+  username=${username:0:16}
+
+  # hvis brugernavnet allerede findes, tilføj tal til sidst
+  orig_username="$username"
+  i=1
+  while id "$username" >/dev/null 2>&1; do
+    suffix="$i"
+    username="${orig_username:0:$((16-${#suffix}))}$suffix"
+    i=$((i+1))
+  done
+
+  echo "Opretter bruger: $username  (navn: $full_name)"
+
+  # opret bruger med hjemmemappe og bash som shell
+  useradd -m -s /bin/bash -c "$full_name" -g "$GROUP_NAME" "$username"
+
+  # sæt password til 1234
+  echo "${username}:1234" | chpasswd
+
+  # tving password-ændring ved første login
+  passwd -e "$username" >/dev/null 2>&1
+
+done < "$INPUT_FILE"
+
+echo
+echo "Færdig! Alle nye brugere har password: 1234 (og skal ændre det ved første login)."
