@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+if [ "$EUID" -ne 0 ]; then
+  echo "Kør dette script som root (brug sudo)."
+  exit 1
+fi
+
+# Opret grundmappen
+mkdir -p /srv/ctf/logs
+mkdir -p /srv/ctf/data/notes
+mkdir -p /srv/ctf/.hidden/flag
+
+# Lidt “støjfiler”
+echo "System log data..." > /srv/ctf/logs/system.log
+echo "Auth log data..." > /srv/ctf/logs/auth.log
+echo "Random log data..." > /srv/ctf/logs/random1.log
+
+echo "Liste over brugere (ikke vigtig til flag)" > /srv/ctf/data/users.csv
+echo "Måske er der et hint et sted..." > /srv/ctf/data/readme.txt
+
+echo "Note 1: Denne fil er ikke den, du leder efter." > /srv/ctf/data/notes/note1.txt
+echo "Note 2: Prøv at kigge efter skjulte mapper." > /srv/ctf/data/notes/note2.txt
+
+# Skjult mappe og flag-fil
+echo "Her ligger mest ligegyldig tekst." > /srv/ctf/.hidden/misc.txt
+
+cat << 'EOF' > /srv/ctf/.hidden/flag/skriv_dit_navn_her.txt
+Tillykke, du har fundet filen!
+
+Opgave:
+  1) Skriv dit fulde navn på linjen herunder
+  2) Gem filen
+
+Navn:
+EOF
+
+# Giv alle læserettigheder til CTF-området og skriveregt. til selve flag-filen
+chmod -R a+r /srv/ctf
+chmod a+w /srv/ctf/.hidden/flag/skriv_dit_navn_her.txt
+
+echo "CTF-miljø oprettet under /srv/ctf"
